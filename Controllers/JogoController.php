@@ -4,8 +4,8 @@
  *
  *  @author     Guilherme Gaspar <guiigaspar@live.com>
  *  @copyright  2019
- *  @file       HomeController.php
- *  @desc       
+ *  @file       JogoController.php
+ *  @desc       Controle do módulo de Jogo
  */
 
 namespace Controllers;
@@ -83,6 +83,7 @@ class JogoController extends Controller
 			}
 
 			$_SESSION['tropaSociedade'] = $tropaSociedade;
+			$_SESSION['step'] = 'tropa';
 			header('HTTP/1.1 301 Moved Permanently');
 			header('Location: '.BASE_URL.'/jogo/armas');
 			exit;
@@ -99,14 +100,15 @@ class JogoController extends Controller
 
 	public function armas()
 	{
-		$dados = array();
-
+		//Verificações de Segurança
 		if(!isset($_SESSION['tropaSociedade']))
 		{
 			header('HTTP/1.1 301 Moved Permanently');
 			header('Location: '.BASE_URL.'/jogo/tropa');
 			exit;
 		}
+
+		$dados = array();
 
 		//Armas foram enviadas
 		if(isset($_POST['armas']))
@@ -118,10 +120,20 @@ class JogoController extends Controller
 
 			$_SESSION['tropaSociedade'] = $tropaSociedade;
 
+			$_SESSION['step'] = 'armas';
 			header('HTTP/1.1 301 Moved Permanently');
 			header('Location: '.BASE_URL.'/jogo/reconhecimento');
 			exit;
 		}
+
+		if(!isset($_SESSION['step']) || $_SESSION['step'] != 'tropa')
+		{
+			header('HTTP/1.1 301 Moved Permanently');
+			header('Location: '.BASE_URL.'/jogo/tropa');
+			exit;
+		}
+
+		unset($_SESSION['step']);
 
 		//Manuseio de Personagens
 		foreach($_SESSION['tropaSociedade'] as $tropa)
@@ -189,7 +201,8 @@ class JogoController extends Controller
 
 	public function reconhecimento()
 	{
-		if(!isset($_SESSION['tropaSociedade']))
+		//Verificações de Segurança
+		if(!isset($_SESSION['tropaSociedade']) || !isset($_SESSION['step']) || $_SESSION['step'] != 'armas')
 		{
 			header('HTTP/1.1 301 Moved Permanently');
 			header('Location: '.BASE_URL.'/jogo/tropa');
@@ -251,6 +264,7 @@ class JogoController extends Controller
 		}
 
 		$_SESSION['tropaOrcs'] = $tropaOrcs;
+		$_SESSION['step'] = 'reconhecimento';
 
 		$this->loadViewInTemplate('jogo/reconhecimento', array('tropaOrcsList' => $tropaOrcs));
 	}
@@ -272,22 +286,117 @@ class JogoController extends Controller
 		$this->loadViewInTemplate('jogo/recuar', array('frase' => $frases[$sorteia]));
 	}
 
-	private function somaPontos(array $tropa)
-	{
-
-	}
-
 	public function batalha()
 	{
-		if(!isset($_SESSION['tropaSociedade']) || !isset($_SESSION['tropaOrcs']))
+		//Verificações de Segurança
+		if(!isset($_SESSION['tropaSociedade']) || !isset($_SESSION['tropaOrcs'])  ||
+			!isset($_SESSION['step']) || $_SESSION['step'] != 'reconhecimento')
 		{
 			header('HTTP/1.1 301 Moved Permanently');
 			header('Location: '.BASE_URL.'/jogo/tropa');
 			exit;
 		}
 
-		$pontosSociedade = $this->somaPontos($_SESSION['tropaSociedade']);
+		$pontosSociedade = 0;
+		$pontosOrcs = 0;
 
-		$pontosOrcs = $this->somaPontos($_SESSION['tropaOrcs']);
+		//Soma pontos - Tropa Sociedade
+		foreach($_SESSION['tropaSociedade'] as $itemTropa)
+		{
+			$personagemObj = (new Personagem)->getPersonagemById($itemTropa['personagemId']);
+			$armaObj = (new Arma)->getArmaById($itemTropa['armaId']);
+
+			//Soma pontos do personagem
+			$pontosSociedade += $personagemObj->getForca() + $personagemObj->getDestreza() + $personagemObj->getMagia();
+
+			//Verifica se a arma é compatível com o personagem pela sua limitação
+			if($this->verificaLimitacaoArma($armaObj->getID(), $personagemObj->getID()))
+			{
+				$armaForca = rand($armaObj->getForcaMin(), $armaObj->getForcaMax());
+				$armaDestreza = rand($armaObj->getDestrezaMin(), $armaObj->getDestrezaMax());
+				$armaMagia = rand($armaObj->getMagiaMin(), $armaObj->getMagiaMax());
+
+				//Soma pontos da arma
+				$pontosSociedade += $armaForca + $armaDestreza + $armaMagia;
+			}
+		}
+
+		//Soma pontos - Tropa Orcs
+		foreach($_SESSION['tropaOrcs'] as $itemTropa)
+		{
+			$personagemObj = (new Personagem)->getPersonagemById($itemTropa['personagemId']);
+			$armaObj = (new Arma)->getArmaById($itemTropa['armaId']);
+
+			$somaPontos = false;
+
+			/*
+			 * Os pontos do Olho De Sauron só serão somados a tropa de orcs se
+			 * na tropa da sociedade tiver o Frodo usando o Um Anel como arma
+			*/
+			//Olho De Sauron - ID 10
+			if($personagemObj->getID() == 10)
+			{
+				foreach($_SESSION['tropaSociedade'] as $itemTropaSoc)
+				{
+					//Frodo - ID 1 / Um Anel - ID 10
+					if($itemTropaSoc['personagemId'] == 1 && $itemTropaSoc['armaId'] == 10)
+					{
+						$somaPontos = true;
+						break;
+					}
+				}
+			}
+			else
+				$somaPontos = true;
+
+			//Se permitido, soma pontos do personagem
+			if($somaPontos)
+				$pontosOrcs += $personagemObj->getForca() + $personagemObj->getDestreza() + $personagemObj->getMagia();
+
+			//Verifica se a arma é compatível com o personagem pela sua limitação
+			if($this->verificaLimitacaoArma($armaObj->getID(), $personagemObj->getID()))
+			{
+				$armaForca = rand($armaObj->getForcaMin(), $armaObj->getForcaMax());
+				$armaDestreza = rand($armaObj->getDestrezaMin(), $armaObj->getDestrezaMax());
+				$armaMagia = rand($armaObj->getMagiaMin(), $armaObj->getMagiaMax());
+
+				//Soma pontos da arma
+				$pontosOrcs += $armaForca + $armaDestreza + $armaMagia;
+			}
+		}
+		
+		//echo 'Pontos Sociedade: '.$pontosSociedade.'<br>';
+		//echo 'Pontos Orcs: '.$pontosOrcs;
+
+		if($pontosSociedade > $pontosOrcs)
+		{
+			$titulo = 'Vitória';
+			$classe = 'alert-success';
+			$texto = 'A tropa de Mordor foi massacrada como vermes que são!';
+		}
+		else if($pontosSociedade == $pontosOrcs)
+		{
+			$titulo = 'Empate';
+			$classe = 'alert-warning';
+			$texto = 'Empate !';
+		}
+		else
+		{
+			$titulo = 'Derrota';
+			$classe = 'alert-danger';
+			$texto = 'Essa sociedade é uma vergonha, a Terra Médias está perdida!';
+		}
+
+		$dados = array(
+			'titulo' => $titulo,
+			'classe' => $classe,
+			'texto' => $texto
+		);
+
+		unset($_SESSION['tropaSociedade']);
+		unset($_SESSION['tropaOrcs']);
+		unset($_SESSION['step']);
+
+		$this->loadViewInTemplate('jogo/batalha', $dados);
 	}
 }

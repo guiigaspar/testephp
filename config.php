@@ -15,14 +15,16 @@ $config = array();
 if(ENVIRONMENT == 'develop')
 {
     // Developer/Debug Config
+    error_reporting(E_ALL);
+    ini_set('display_errors', 1);
     
-    define("BASE_URL", "http://localhost:8888/testephp");
+    define("BASE_URL", "http://localhost/testephp");
     define("PROJECT_TITLE", "Teste PHP - Batalha da Sociedade Do Anel");
 
     $config['mysql']['host'] = 'localhost';
-    $config['mysql']['port'] = '8889';
-    $config['mysql']['dbuser'] = 'gaspar';
-    $config['mysql']['dbpass'] = '123456';
+    $config['mysql']['port'] = '3389';
+    $config['mysql']['dbuser'] = 'root';
+    $config['mysql']['dbpass'] = '';
     $config['mysql']['database'] = 'jogo';
     
 }
@@ -31,6 +33,7 @@ else if(ENVIRONMENT == 'production')
     // Production Config
     
     define("BASE_URL", "");
+    define("PROJECT_TITLE", "");
     
     $config['sqlserver']['host'] = '';
     $config['sqlserver']['dbuser'] = '';

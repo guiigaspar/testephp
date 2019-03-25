@@ -11,7 +11,7 @@
 namespace Controllers;
 use \Core\Controller;
 
-class NotFoundController extends Controller
+class HomeController extends Controller
 {
 	public function index()
 	{
